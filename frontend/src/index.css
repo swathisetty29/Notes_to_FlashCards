@@ -1,0 +1,53 @@
+@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  /* Paper-and-ink study notebook palette, not the default AI-cream/terracotta */
+  --color-paper: #EEF1F7;
+  --color-paper-card: #FBFCFE;
+  --color-ink: #1B2A4A;
+  --color-ink-soft: #4A5878;
+  --color-rule: #C7CEDE;
+  --color-correct: #2F9E7A;
+  --color-wrong: #D6472B;
+  --color-accent: #D6472B;
+
+  --font-display: 'Source Serif 4', Georgia, serif;
+  --font-mono: 'Space Mono', ui-monospace, monospace;
+  --font-body: 'Inter', system-ui, sans-serif;
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+}
+
+.dark {
+  --color-paper: #12141A;
+  --color-paper-card: #1A1F2B;
+  --color-ink: #E2E8F0;
+  --color-ink-soft: #94A3B8;
+  --color-rule: #2D3748;
+  --color-correct: #34D399;
+  --color-wrong: #F87171;
+  --color-accent: #F87171;
+}
+
+/* Ruled-paper texture used behind the hero/input area */
+.ruled-bg {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 27px,
+    var(--color-rule) 28px
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
