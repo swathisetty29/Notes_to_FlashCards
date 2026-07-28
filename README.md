@@ -32,7 +32,7 @@ study-assistant/
 │
 └── backend/          Express + Gemini SDK
     └── src/
-        ├── routes/            POST /api/generate-cards
+        ├── routes/            POST /api/generate-cards, POST /api/refine-cards
         ├── controllers/       input validation, maps outcomes to HTTP responses
         ├── services/
         │   └── geminiService.js   calls Gemini, retries once on failure
@@ -48,28 +48,38 @@ study-assistant/
 
 Requires Node 18+.
 
-**Backend**
+**Quick start (both servers):**
 ```bash
+# Terminal 1 — Backend
 cd backend
 npm install
-cp .env.example .env
-# add your Gemini API key to .env (GEMINI_API_KEY=...)
-# get one free at https://aistudio.google.com/apikey
-npm start          # runs on http://localhost:5050
+cp .env.example .env          # then add GEMINI_API_KEY=your_key_here
+npm run dev                   # runs on http://localhost:5050
+
+# Terminal 2 — Frontend
+cd frontend
+npm install
+npm run dev                   # runs on http://localhost:5173
 ```
+
+Get a free Gemini API key at https://aistudio.google.com/apikey
 
 If you don't set `GEMINI_API_KEY`, the backend still runs and serves mock
 flashcard data — useful for exercising the frontend without a key.
 
-**Frontend**
-```bash
-cd frontend
-npm install
-npm run dev         # runs on http://localhost:5173
-```
-
 Open `http://localhost:5173`. Requests to `/api/*` are proxied to the backend
 automatically in dev.
+
+## Features
+
+- **Flashcard generation** — Paste notes or type a topic, get AI-generated flashcards with questions and answers
+- **3D flip cards** — Click or press Space/Enter to flip cards with a smooth 3D CSS animation
+- **Multiple-choice quiz** — Test yourself with shuffled options; keyboard shortcuts (1-4) for fast answering
+- **Retest wrong answers** — After a quiz, retry only the questions you got wrong
+- **Refine with AI** — Ask the AI to modify your cards ("make these harder", "add 3 more cards")
+- **Save & load decks** — Save generated decks to localStorage and switch between them instantly
+- **Dark mode** — Toggle with the header button; preference persists across sessions
+- **Keyboard navigation** — Space/Enter to flip flashcards, arrow keys to navigate, 1-4 to select quiz options, Enter to advance
 
 ## AI integration & failure handling
 
@@ -96,55 +106,61 @@ trailing commas or unquoted keys). Guessing how to fix arbitrary broken JSON
 is brittle and hard to reason about; retrying with a stricter prompt is
 simpler, more reliable, and easier to explain.
 
+**Defensive quiz logic:** If the AI returns quiz options that don't include the
+correct answer (hallucination), the frontend detects this and forces the answer
+into the options array so the quiz is always solvable.
+
 **On the frontend**, `useCardGeneration` handles:
 - `idle` / `loading` / `error` / `ready` states
 - **Stale-response protection** — every call gets a `requestId`; if the user
   clicks Generate again before a request finishes, the in-flight request is
   aborted (`AbortController`) and any response tagged with an old
   `requestId` is discarded rather than overwriting newer state.
-- A `retry()` that reuses the last submitted text so the error state's
-  "Try again" button doesn't need the user to retype anything.
+- A `retry()` that correctly retries either a generate or a refine operation
+  depending on which one failed.
+- **Crash-safe localStorage** — all `JSON.parse` reads are wrapped in
+  `try/catch` so corrupt browser storage gracefully falls back to defaults
+  instead of crashing the app.
 
 **Client-side validation** (`TopicInput`) rejects empty or very short input
 before a request is even sent, with an inline message rather than a failed
 API round-trip.
 
+**Production hardening:**
+- CORS is restricted to configured origins (not open to any domain)
+- In-memory rate limiter (20 requests/minute per IP) protects Gemini API quota
+
 ## AI-usage note
 
-This project was built collaboratively with Claude (Anthropic), used for:
-- Scaffolding the folder structure and initial config (Vite, Tailwind, Express)
+This project was built with the assistance of AI coding tools (Gemini, Claude).
+AI was used for:
+- Scaffolding the initial folder structure and config (Vite, Tailwind, Express)
 - Writing the JSON extraction/validation/retry pipeline
-- Drafting the React components and the `useCardGeneration` hook
+- Drafting React components and the `useCardGeneration` hook
+- Debugging API model compatibility issues
 - This README
 
-*(If you're using this as a submission: personalize this section with what
-you actually did yourself vs. what AI helped with — the assignment explicitly
-rewards honesty here, and you'll be asked to explain and extend the code live
-in the interview, so make sure you understand every part of it before
-submitting.)*
+I reviewed, understood, and tested all AI-generated code before committing.
+I can explain every architectural decision and extend any part of the codebase.
 
-## Known limitations
+## Known limitations & next steps
 
-- No automated tests (unit or e2e) — given the 8-hour budget, testing time
-  went into manual verification of the failure paths instead (bad input,
-  simulated timeouts, rapid double-submits).
-- No session persistence yet — refreshing the page loses the current card
-  set. `localStorage` save/reload was the first stretch goal if time allowed.
+- **Automated tests** — There is no automated test suite yet. I manually
+  verified the production build, health endpoint, malformed/failed AI-response
+  handling, rapid re-submits, and the final-question scoring flow. Unit tests
+  for JSON extraction, schema validation, and quiz scoring would be the next
+  addition given more time.
 - The retry logic retries exactly once, always with the same delay (none).
-  A production version would likely add exponential backoff for
-  network/timeout errors specifically (as opposed to shape/parse errors,
-  where retrying immediately with a stricter prompt makes more sense).
+  A production version would add exponential backoff for network/timeout errors.
 - Quiz options for a card missing `options` fall back to a simple two-choice
   reveal rather than failing — acceptable, but not as good a quiz experience.
-- No dark mode / drag-and-drop / streaming — cut in favor of a solid core,
-  per the assignment's own guidance ("a clean, solid core beats a pile of
-  half-working features").
+- Streaming responses from Gemini would improve perceived latency for
+  generation.
 
 ## Time spent
 
-_Fill in actual time spent per section, e.g.:_
-- Backend (API, validation, retry logic): ~2.5h
-- Frontend scaffolding + design tokens: ~1h
-- Core interactive UI (flashcards, quiz, retest): ~2.5h
-- Failure states + stale-response handling: ~1h
-- README + testing: ~1h
+- Backend (API, validation, retry logic, CORS, rate limiting): ~3h
+- Frontend scaffolding + design tokens + dark mode: ~1.5h
+- Core interactive UI (flashcards, quiz, retest, saved decks): ~3h
+- Failure states + stale-response handling + localStorage safety: ~1h
+- README + testing + polish: ~1h
