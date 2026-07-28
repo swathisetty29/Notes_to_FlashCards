@@ -8,7 +8,17 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:5050',
+        // Use IPv4 explicitly: the Express server binds to 0.0.0.0 for
+        // production hosting, while Windows can resolve localhost to IPv6.
+        target: 'http://127.0.0.1:5050',
+        changeOrigin: true,
+      },
+    },
+  },
+  preview: {
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:5050',
         changeOrigin: true,
       },
     },
