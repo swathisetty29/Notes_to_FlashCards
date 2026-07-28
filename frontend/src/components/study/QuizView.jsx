@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { shuffle } from "../../utils/shuffle";
 
 // Cards without options (e.g. AI omitted them) fall back to a simple
@@ -21,6 +21,13 @@ export default function QuizView({ cards, onFinish }) {
   const [wrongIds, setWrongIds] = useState([]);
   const [correctCount, setCorrectCount] = useState(0);
 
+  // Refs mirror the latest state so event handlers never suffer from
+  // stale-closure reads — especially critical on the final question
+  // where React may not have flushed the setState from handleSelect
+  // before handleNext reads the tally.
+  const correctRef = useRef(0);
+  const wrongRef = useRef([]);
+
   const card = cards[index];
   const options = useMemo(() => shuffle(optionsFor(card)), [card.id]);
 
@@ -30,9 +37,13 @@ export default function QuizView({ cards, onFinish }) {
     setRevealed(true);
     const isCorrect = option === card.answer;
     if (isCorrect) {
-      setCorrectCount((c) => c + 1);
+      const next = correctCount + 1;
+      setCorrectCount(next);
+      correctRef.current = next;
     } else {
-      setWrongIds((ids) => [...ids, card.id]);
+      const next = [...wrongIds, card.id];
+      setWrongIds(next);
+      wrongRef.current = next;
     }
   }
 
@@ -42,7 +53,13 @@ export default function QuizView({ cards, onFinish }) {
       setSelected(null);
       setRevealed(false);
     } else {
-      onFinish({ correctCount, total: cards.length, wrongIds });
+      // Use refs to guarantee the final answer is always included,
+      // regardless of React's state-batching timing.
+      onFinish({
+        correctCount: correctRef.current,
+        total: cards.length,
+        wrongIds: wrongRef.current,
+      });
     }
   }
 
@@ -115,4 +132,3 @@ export default function QuizView({ cards, onFinish }) {
     </div>
   );
 }
-

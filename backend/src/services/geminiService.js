@@ -41,7 +41,7 @@ async function callModel(prompt) {
       contents: prompt,
       config: {
         systemInstruction: buildSystemPrompt(),
-        temperature: 0.4,
+        responseMimeType: "application/json",
       },
     }),
     TIMEOUT_MS

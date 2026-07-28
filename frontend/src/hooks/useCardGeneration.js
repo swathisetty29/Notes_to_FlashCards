@@ -1,6 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchCardSet, refineCardSet } from "../services/api";
 
+/** Safely read and parse JSON from localStorage. Returns fallback on any error. */
+function safeParse(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    localStorage.removeItem(key); // clear corrupted entry
+    return fallback;
+  }
+}
+
 /**
  * status: 'idle' | 'loading' | 'error' | 'ready'
  *
@@ -19,8 +30,7 @@ export function useCardGeneration() {
     return saved === "ready" ? "ready" : "idle";
   });
   const [cards, setCards] = useState(() => {
-    const saved = localStorage.getItem("studyState_cards");
-    return saved ? JSON.parse(saved) : null;
+    return safeParse("studyState_cards", null);
   });
   const [topic, setTopic] = useState(() => {
     return localStorage.getItem("studyState_topic") || null;
@@ -30,6 +40,7 @@ export function useCardGeneration() {
   const latestRequestId = useRef(0);
   const abortRef = useRef(null);
   const lastTextRef = useRef("");
+  const lastRefineRef = useRef(null); // stores last refine instruction for retry
 
   useEffect(() => {
     if (status === "ready") {
@@ -51,6 +62,7 @@ export function useCardGeneration() {
 
   const generate = useCallback(async (text) => {
     lastTextRef.current = text;
+    lastRefineRef.current = null; // mark this as a generate, not a refine
 
     // Cancel any in-flight request before starting a new one.
     if (abortRef.current) {
@@ -108,12 +120,10 @@ export function useCardGeneration() {
     localStorage.removeItem("studyState_quiz");
   }, [reset]);
 
-  const retry = useCallback(() => {
-    if (lastTextRef.current) generate(lastTextRef.current);
-  }, [generate]);
-
   const refine = useCallback(async (instruction) => {
     if (!cards || !topic) return;
+
+    lastRefineRef.current = instruction; // remember for retry
 
     if (abortRef.current) {
       abortRef.current.abort();
@@ -148,9 +158,18 @@ export function useCardGeneration() {
     }
   }, [cards, topic]);
 
+  // retry correctly re-attempts either generate or refine depending on
+  // which operation last failed.
+  const retry = useCallback(() => {
+    if (lastRefineRef.current) {
+      refine(lastRefineRef.current);
+    } else if (lastTextRef.current) {
+      generate(lastTextRef.current);
+    }
+  }, [generate, refine]);
+
   const [savedDecks, setSavedDecks] = useState(() => {
-    const saved = localStorage.getItem("studyState_saved_decks");
-    return saved ? JSON.parse(saved) : [];
+    return safeParse("studyState_saved_decks", []);
   });
 
   useEffect(() => {
@@ -162,8 +181,6 @@ export function useCardGeneration() {
     
     // Get the current quiz state from localStorage so it saves along with the deck
     const quizMode = localStorage.getItem("studyState_quiz_mode") || "flashcards";
-    const quizCards = localStorage.getItem("studyState_quiz_cards");
-    const quizResult = localStorage.getItem("studyState_quiz_result");
 
     const newDeck = {
       id: Date.now().toString(),
@@ -171,8 +188,8 @@ export function useCardGeneration() {
       cards,
       quizData: {
         mode: quizMode,
-        quizCards: quizCards ? JSON.parse(quizCards) : null,
-        quizResult: quizResult ? JSON.parse(quizResult) : null
+        quizCards: safeParse("studyState_quiz_cards", null),
+        quizResult: safeParse("studyState_quiz_result", null),
       }
     };
     setSavedDecks(prev => [...prev, newDeck]);
